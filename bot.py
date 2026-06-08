@@ -12,8 +12,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import settings
 from database.db import init_db
+# Импортируем все модули хэндлеров
 from handlers import moderation, economy, reputation, marriage, misc, profile, roles
-from handlers.reputation import router as reputation_router
 from middlewares.admin import AdminMiddleware
 from middlewares.antiflood import AntiFloodMiddleware
 
@@ -47,14 +47,15 @@ async def main() -> None:
     dp.message.middleware(AntiFloodMiddleware(limit=5, window=10))
     dp.message.middleware(AdminMiddleware())
 
-    # Подключаем роутеры
-    dp.include_router(profile.router)
-    dp.include_router(moderation.router)
-    dp.include_router(economy.router)
-    dp.include_router(reputation_router)
-    dp.include_router(marriage.router)
-    dp.include_router(misc.router)
-    dp.include_router(roles.router)
+    # Подключаем роутеры В ПРАВИЛЬНОМ ПОРЯДКЕ
+    # Сначала общие и важные команды, чтобы они никогда не перехватывались другими фильтрами
+    dp.include_router(misc.router)        # Общие команды (/start, /помощь, настройки) — ТЕПЕРЬ ПЕРВЫЙ!
+    dp.include_router(profile.router)     # Профиль и карточки (кто я)
+    dp.include_router(reputation.router)  # Репутация и исправленный /топ
+    dp.include_router(economy.router)     # Экономика, баланс, казино
+    dp.include_router(moderation.router)  # Модерация и правила чата
+    dp.include_router(marriage.router)    # Браки и разводы
+    dp.include_router(roles.router)       # Должности и ДК
 
     # Удаляем вебхук и запускаем поллинг
     await bot.delete_webhook(drop_pending_updates=True)
