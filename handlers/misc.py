@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 HELP_TEXT = """
-🌸 <b>Iris Bot 2.0 — Помощь</b>
+🌸 <b>Chatix — Помощь</b>
 
 <b>📋 Общие</b>
 /старт — Начало работы
