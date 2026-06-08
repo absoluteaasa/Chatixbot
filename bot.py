@@ -13,6 +13,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from config import settings
 from database.db import init_db
 from handlers import moderation, economy, marriage, misc, profile, roles
+from handlers.reputation import router as reputation_router
 from middlewares.admin import AdminMiddleware
 from middlewares.antiflood import AntiFloodMiddleware
 
@@ -35,8 +36,9 @@ async def main() -> None:
     await init_db()
     logger.info("✅ База данных инициализирована")
 
+    # Токен берется из файла конфигурации (из переменных окружения)
     bot = Bot(
-        token=settings.8677704219:AAEmBtVWhZa4yTmbGYK3VSdPLTGK62-icp4,
+        token=settings.BOT_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = Dispatcher(storage=MemoryStorage())
@@ -49,7 +51,7 @@ async def main() -> None:
     dp.include_router(profile.router)
     dp.include_router(moderation.router)
     dp.include_router(economy.router)
-    dp.include_router(reputation.router)
+    dp.include_router(reputation_router)
     dp.include_router(marriage.router)
     dp.include_router(misc.router)
     dp.include_router(roles.router)
