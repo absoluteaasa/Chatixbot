@@ -1,5 +1,4 @@
 aiogram==3.7.0
 sqlalchemy==2.0.30
 aiosqlite==0.20.0
-asyncpg==0.29.0          # Только для PostgreSQL, можно убрать если используешь SQLite
 pydantic-settings==2.3.1
