@@ -12,7 +12,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import settings
 from database.db import init_db
-from handlers import moderation, economy, marriage, misc, profile, roles
+from handlers import moderation, economy, reputation, marriage, misc, profile, roles
 from handlers.reputation import router as reputation_router
 from middlewares.admin import AdminMiddleware
 from middlewares.antiflood import AntiFloodMiddleware
