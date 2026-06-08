@@ -36,7 +36,7 @@ async def main() -> None:
     logger.info("✅ База данных инициализирована")
 
     bot = Bot(
-        token=settings.BOT_TOKEN,
+        token=settings.8677704219:AAEmBtVWhZa4yTmbGYK3VSdPLTGK62-icp4,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = Dispatcher(storage=MemoryStorage())
