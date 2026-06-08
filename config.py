@@ -5,7 +5,7 @@
 from pydantic_settings import BaseSettings
 
 
-BOT_TOKEN: str
+BOT_TOKEN: str = None
     DATABASE_URL: str = "sqlite+aiosqlite:///iris_bot.db"
     # Для PostgreSQL:
     # DATABASE_URL: str = "postgresql+asyncpg://user:pass@localhost/iris_bot"
