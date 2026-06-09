@@ -390,20 +390,27 @@ RP_ACTIONS = {
 }
 
 
-@router.message(F.text.regexp(r"^!(обнять|поцеловать|ударить|погладить|укусить|подмигнуть)", flags=2))
+@router.message(F.text.regexp(r"^[!/.]?(обнять|поцеловать|ударить|погладить|укусить|подмигнуть)(\s|$)", flags=2))
 async def cmd_rp(message: Message) -> None:
-    """Обрабатывает все РП-команды."""
-    text = (message.text or "").lower()
+    """Обрабатывает все РП-команды (!, /, . или без префикса)."""
+    import re
+    text = (message.text or "").lower().strip().lstrip("!/.")
     action = None
     for key in RP_ACTIONS:
-        if text.startswith(f"!{key}"):
+        if text.startswith(key):
             action = key
             break
 
     if not action:
         return
 
-    target = extract_target(message)
+    # Определяем цель: ответ на сообщение или @упоминание в тексте
+    target = None
+    if message.reply_to_message and message.reply_to_message.from_user:
+        target = message.reply_to_message.from_user
+    else:
+        target = extract_target(message)
+
     actor = message.from_user
     action_data = RP_ACTIONS[action]
 
@@ -411,7 +418,7 @@ async def cmd_rp(message: Message) -> None:
     if target:
         target_mention = mention_user(target)
     else:
-        target_mention = "<b>никого</b>"
+        target_mention = "<b>всех</b>"
 
     phrase = random.choice(action_data["phrases"]).format(
         actor=actor_mention, target=target_mention

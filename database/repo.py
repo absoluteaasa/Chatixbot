@@ -419,3 +419,66 @@ async def remove_from_banlist(user_id: int) -> bool:
 async def is_in_banlist(user_id: int) -> bool:
     async with session_scope() as s:
         return await s.get(GlobalBanList, user_id) is not None
+
+# ─── Премиум-подписка ─────────────────────────────────────────────────────────
+
+async def get_premium_record(user_id: int):
+    async with session_scope() as s:
+        return await s.get(PremiumBalance, user_id)
+
+async def activate_premium(user_id: int) -> None:
+    """Активирует премиум на 30 дней."""
+    from datetime import timedelta
+    async with session_scope() as s:
+        rec = await s.get(PremiumBalance, user_id)
+        now = datetime.utcnow()
+        if rec:
+            # Продлеваем если уже есть
+            base = rec.premium_until if rec.premium_until and rec.premium_until > now else now
+            rec.has_premium = True
+            rec.premium_until = base + timedelta(days=30)
+        else:
+            rec = PremiumBalance(
+                user_id=user_id,
+                checks=0,
+                has_premium=True,
+                premium_until=now + timedelta(days=30)
+            )
+            s.add(rec)
+        await s.commit()
+
+async def is_premium(user_id: int) -> bool:
+    """Проверяет активен ли премиум."""
+    async with session_scope() as s:
+        rec = await s.get(PremiumBalance, user_id)
+        if not rec or not rec.has_premium:
+            return False
+        if rec.premium_until and rec.premium_until < datetime.utcnow():
+            rec.has_premium = False
+            await s.commit()
+            return False
+        return True
+
+async def claim_free_chatik(user_id: int) -> tuple[bool, str]:
+    """Выдаёт 1 бесплатный чатик в день для премиум-пользователей."""
+    from datetime import timedelta
+    async with session_scope() as s:
+        rec = await s.get(PremiumBalance, user_id)
+        if not rec or not rec.has_premium:
+            return False, "no_premium"
+        if rec.premium_until and rec.premium_until < datetime.utcnow():
+            rec.has_premium = False
+            await s.commit()
+            return False, "expired"
+        now = datetime.utcnow()
+        if rec.last_free_chatik:
+            diff = now - rec.last_free_chatik
+            if diff.total_seconds() < 86400:
+                remaining = 86400 - diff.total_seconds()
+                h = int(remaining // 3600)
+                m = int((remaining % 3600) // 60)
+                return False, f"{h}ч {m}мин"
+        rec.checks += 1
+        rec.last_free_chatik = now
+        await s.commit()
+        return True, str(rec.checks)

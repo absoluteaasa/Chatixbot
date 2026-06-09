@@ -109,6 +109,10 @@ class PremiumBalance(Base):
     __tablename__ = "premium_balance"
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     checks: Mapped[int] = mapped_column(Integer, default=0)
+    # Премиум-подписка (True если активна)
+    has_premium: Mapped[bool] = mapped_column(Boolean, default=False)
+    premium_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_free_chatik: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 class ShopItem(Base):
     __tablename__ = "shop_items"
@@ -138,15 +142,3 @@ class SpamEntry(Base):
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    logger.info("Таблицы БД созданы/проверены")
-
-
-# ─── Глобальная база нарушителей ─────────────────────────────────────────────
-
-class GlobalBanList(Base):
-    __tablename__ = "global_banlist"
-
-    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    reason: Mapped[str] = mapped_column(Text, default="")
-    added_by: Mapped[int] = mapped_column(BigInteger)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
