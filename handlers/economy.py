@@ -1,18 +1,19 @@
 """
-Модуль экономики и мини-игр:
-  /баланс, /бонус, /перевод
+Модуль экономики и мини-игр Chatix 1.8:
+  баланс, бонус, перевод
   Казино (рулетка), Кости, Ставки
-  РП-команды: !обнять, !ударить, !поцеловать
+  РП-команды: обнять, ударить, поцеловать...
+Команды работают с !, /, . или без префикса.
 """
 
 from __future__ import annotations
 
 import logging
 import random
+import re
 from typing import NamedTuple
 
 from aiogram import F, Router
-from aiogram.filters import Command
 from aiogram.types import Message
 
 from config import settings
@@ -22,15 +23,16 @@ from utils.helpers import extract_target, format_balance, mention_user
 logger = logging.getLogger(__name__)
 router = Router()
 
+CMD = r"^[/!.]?"
+
 # ─── Баланс ───────────────────────────────────────────────────────────────────
 
-@router.message(Command("баланс"))
+@router.message(F.text.regexp(CMD + r"(баланс|balance)(\s|$)", flags=re.IGNORECASE))
 async def cmd_balance(message: Message) -> None:
     user = message.from_user
     await repo.get_or_create_user(user.id, user.username, user.full_name)
     db_user = await repo.get_user(user.id)
     balance = db_user.balance if db_user else settings.STARTING_BALANCE
-
     await message.reply(
         f"💰 Баланс {mention_user(user)}:\n"
         f"{format_balance(balance)}"
@@ -39,13 +41,11 @@ async def cmd_balance(message: Message) -> None:
 
 # ─── Ежедневный бонус ─────────────────────────────────────────────────────────
 
-@router.message(Command("бонус"))
+@router.message(F.text.regexp(CMD + r"бонус(\s|$)", flags=re.IGNORECASE))
 async def cmd_bonus(message: Message) -> None:
     user = message.from_user
     await repo.get_or_create_user(user.id, user.username, user.full_name)
-
     success, next_time = await repo.claim_daily_bonus(user.id, settings.DAILY_BONUS)
-
     if success:
         logger.info(f"[BONUS] Пользователь {user.id} получил ежедневный бонус")
         await message.reply(
@@ -66,46 +66,35 @@ async def cmd_bonus(message: Message) -> None:
 
 # ─── Перевод ──────────────────────────────────────────────────────────────────
 
-@router.message(Command("перевод"))
+@router.message(F.text.regexp(CMD + r"перевод(\s|$)", flags=re.IGNORECASE))
 async def cmd_transfer(message: Message) -> None:
-    """
-    /перевод [сумма] — ответ на сообщение или упоминание
-    /перевод 100 @user
-    """
     user = message.from_user
     target = extract_target(message)
-
     if not target:
         await message.reply(
             "ℹ️ Использование: ответь на сообщение пользователя и напиши\n"
-            "<code>/перевод 100</code>"
+            "<code>перевод 100</code>"
         )
         return
-
     if target.id == user.id:
         await message.reply("🤨 Себе переводить нельзя.")
         return
-
-    parts = message.text.split()
+    text = re.sub(r'^[/!.]', '', message.text).strip()
+    parts = text.split()
     if len(parts) < 2:
-        await message.reply("ℹ️ Укажи сумму: <code>/перевод 100</code>")
+        await message.reply("ℹ️ Укажи сумму: <code>перевод 100</code>")
         return
-
     try:
         amount = int(parts[1])
     except ValueError:
         await message.reply("❌ Сумма должна быть целым числом.")
         return
-
     if amount <= 0:
         await message.reply("❌ Сумма должна быть положительной.")
         return
-
     await repo.get_or_create_user(user.id, user.username, user.full_name)
     await repo.get_or_create_user(target.id, target.username, target.full_name)
-
     success = await repo.transfer_balance(user.id, target.id, amount)
-
     if success:
         logger.info(f"[TRANSFER] {user.id} → {target.id}: {amount}")
         await message.reply(
@@ -118,20 +107,17 @@ async def cmd_transfer(message: Message) -> None:
 # ─── Казино (рулетка) ─────────────────────────────────────────────────────────
 
 ROULETTE_MULTIPLIER = {
-    "red": 2,    # красный (18 чисел)
-    "black": 2,  # чёрный (18 чисел)
-    "green": 14, # зелёный (0) — редко
-    "even": 2,   # чётный
-    "odd": 2,    # нечётный
+    "red": 2,
+    "black": 2,
+    "green": 14,
+    "even": 2,
+    "odd": 2,
 }
-
 RED_NUMBERS = {1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36}
-
 
 class SpinResult(NamedTuple):
     number: int
     color: str
-
 
 def _spin_roulette() -> SpinResult:
     number = random.randint(0, 36)
@@ -143,51 +129,38 @@ def _spin_roulette() -> SpinResult:
         color = "black"
     return SpinResult(number, color)
 
-
 COLOR_EMOJI = {"red": "🔴", "black": "⚫", "green": "🟢"}
 
-
-@router.message(Command("казино"))
+@router.message(F.text.regexp(CMD + r"казино(\s|$)", flags=re.IGNORECASE))
 async def cmd_casino(message: Message) -> None:
-    """
-    /казино [ставка] [red|black|green|even|odd|число 0-36]
-    Пример: /казино 50 red
-    """
     user = message.from_user
     await repo.get_or_create_user(user.id, user.username, user.full_name)
-
-    parts = message.text.split()
+    text = re.sub(r'^[/!.]', '', message.text).strip()
+    parts = text.split()
     if len(parts) < 3:
         await message.reply(
             "🎰 <b>Казино — Рулетка</b>\n\n"
-            "Использование: <code>/казино [ставка] [цвет/число]</code>\n"
+            "Использование: <code>казино [ставка] [цвет/число]</code>\n"
             "Варианты: <code>red, black, green, even, odd, 0-36</code>\n\n"
             "Выигрыши: red/black/even/odd ×2 | green ×14 | число ×35"
         )
         return
-
     try:
         bet = int(parts[1])
     except ValueError:
         await message.reply("❌ Ставка должна быть числом.")
         return
-
     if bet <= 0:
         await message.reply("❌ Ставка должна быть > 0.")
         return
-
     db_user = await repo.get_user(user.id)
     if not db_user or db_user.balance < bet:
         await message.reply(f"❌ Недостаточно ирисок! Твой баланс: {format_balance(db_user.balance if db_user else 0)}")
         return
-
     choice = parts[2].lower()
     result = _spin_roulette()
-
-    # Определяем победу
     win = False
     multiplier = 0
-
     if choice in ("red", "black", "green"):
         if choice == result.color:
             win = True
@@ -207,13 +180,9 @@ async def cmd_casino(message: Message) -> None:
     else:
         await message.reply("❌ Неверный вариант ставки. Используй: red, black, green, even, odd или число 0-36")
         return
-
     color_e = COLOR_EMOJI.get(result.color, "⚪")
-
     if win:
         profit = bet * multiplier
-        await repo.update_balance(user.id, profit - bet)  # выигрыш минус ставка уже снята
-        # Точнее: сначала снимаем ставку, потом начисляем выигрыш
         await repo.update_balance(user.id, -bet)
         await repo.update_balance(user.id, profit)
         logger.info(f"[CASINO WIN] {user.id} поставил {bet}, выиграл {profit}")
@@ -232,43 +201,32 @@ async def cmd_casino(message: Message) -> None:
 
 # ─── Кости ────────────────────────────────────────────────────────────────────
 
-@router.message(Command("кости"))
+@router.message(F.text.regexp(CMD + r"кости(\s|$)", flags=re.IGNORECASE))
 async def cmd_dice(message: Message) -> None:
-    """
-    /кости [ставка] — бросок двух кубиков против бота.
-    Если сумма игрока > суммы бота — выигрыш ×2.
-    Ничья — возврат ставки.
-    """
     user = message.from_user
     await repo.get_or_create_user(user.id, user.username, user.full_name)
-
-    parts = message.text.split()
+    text = re.sub(r'^[/!.]', '', message.text).strip()
+    parts = text.split()
     if len(parts) < 2:
-        await message.reply("🎲 Использование: <code>/кости [ставка]</code>")
+        await message.reply("🎲 Использование: <code>кости [ставка]</code>")
         return
-
     try:
         bet = int(parts[1])
     except ValueError:
         await message.reply("❌ Ставка должна быть числом.")
         return
-
     if bet <= 0:
         await message.reply("❌ Ставка > 0.")
         return
-
     db_user = await repo.get_user(user.id)
     if not db_user or db_user.balance < bet:
         await message.reply("❌ Недостаточно ирисок!")
         return
-
     player_dice = (random.randint(1, 6), random.randint(1, 6))
     bot_dice = (random.randint(1, 6), random.randint(1, 6))
     player_sum = sum(player_dice)
     bot_sum = sum(bot_dice)
-
     dice_faces = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
-
     lines = [
         f"🎲 <b>Кости</b>",
         f"",
@@ -276,7 +234,6 @@ async def cmd_dice(message: Message) -> None:
         f"Бот: {dice_faces[bot_dice[0]]} {dice_faces[bot_dice[1]]} = <b>{bot_sum}</b>",
         f"",
     ]
-
     if player_sum > bot_sum:
         await repo.update_balance(user.id, bet)
         lines.append(f"🎉 {mention_user(user)} победил! +{format_balance(bet)}")
@@ -285,46 +242,35 @@ async def cmd_dice(message: Message) -> None:
         lines.append(f"😔 Бот победил! -{format_balance(bet)}")
     else:
         lines.append("🤝 Ничья! Ставка возвращена.")
-
     await message.reply("\n".join(lines))
 
 
-# ─── Ставки (coinflip) ───────────────────────────────────────────────────────
+# ─── Ставки (coinflip) ────────────────────────────────────────────────────────
 
-@router.message(Command("ставка"))
+@router.message(F.text.regexp(CMD + r"ставка(\s|$)", flags=re.IGNORECASE))
 async def cmd_coinflip(message: Message) -> None:
-    """
-    /ставка [сумма] [орёл|решка] — подбрасывает монету.
-    """
     user = message.from_user
     await repo.get_or_create_user(user.id, user.username, user.full_name)
-
-    parts = message.text.split()
+    text = re.sub(r'^[/!.]', '', message.text).strip()
+    parts = text.split()
     if len(parts) < 3:
-        await message.reply(
-            "🪙 Использование: <code>/ставка [сумма] [орёл|решка]</code>"
-        )
+        await message.reply("🪙 Использование: <code>ставка [сумма] [орёл|решка]</code>")
         return
-
     try:
         bet = int(parts[1])
     except ValueError:
         await message.reply("❌ Ставка — число.")
         return
-
     choice = parts[2].lower()
     if choice not in ("орёл", "решка"):
         await message.reply("❌ Только <code>орёл</code> или <code>решка</code>!")
         return
-
     db_user = await repo.get_user(user.id)
     if not db_user or db_user.balance < bet:
         await message.reply("❌ Недостаточно ирисок!")
         return
-
     result = random.choice(["орёл", "решка"])
     coin_emoji = "🦅" if result == "орёл" else "🌿"
-
     if choice == result:
         await repo.update_balance(user.id, bet)
         await message.reply(
@@ -390,36 +336,25 @@ RP_ACTIONS = {
 }
 
 
-@router.message(F.text.regexp(r"^[!/.]?(обнять|поцеловать|ударить|погладить|укусить|подмигнуть)(\s|$)", flags=2))
+@router.message(F.text.regexp(CMD + r"(обнять|поцеловать|ударить|погладить|укусить|подмигнуть)(\s|$)", flags=re.IGNORECASE))
 async def cmd_rp(message: Message) -> None:
-    """Обрабатывает все РП-команды (!, /, . или без префикса)."""
-    import re
     text = (message.text or "").lower().strip().lstrip("!/.")
     action = None
     for key in RP_ACTIONS:
         if text.startswith(key):
             action = key
             break
-
     if not action:
         return
-
-    # Определяем цель: ответ на сообщение или @упоминание в тексте
     target = None
     if message.reply_to_message and message.reply_to_message.from_user:
         target = message.reply_to_message.from_user
     else:
         target = extract_target(message)
-
     actor = message.from_user
     action_data = RP_ACTIONS[action]
-
     actor_mention = mention_user(actor)
-    if target:
-        target_mention = mention_user(target)
-    else:
-        target_mention = "<b>всех</b>"
-
+    target_mention = mention_user(target) if target else "<b>всех</b>"
     phrase = random.choice(action_data["phrases"]).format(
         actor=actor_mention, target=target_mention
     )

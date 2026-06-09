@@ -21,7 +21,7 @@ _pending_proposals: dict[tuple[int, int], tuple[int, asyncio.Task]] = {}
 
 
 @router.message(Command("брак"))
-@router.message(F.text.lower().in_({"брак", "!брак", ".брак"}))
+@router.message(F.text.lower().in_({"брак", "!брак", ".брак", "/брак"}))
 async def cmd_propose(message: Message) -> None:
     proposer = message.from_user
     await repo.get_or_create_user(proposer.id, proposer.username, proposer.full_name)
@@ -119,7 +119,7 @@ async def cmd_marriage_response(message: Message) -> None:
 
 
 @router.message(Command("развод"))
-@router.message(F.text.lower().in_({"развод", "!развод", ".развод"}))
+@router.message(F.text.lower().in_({"развод", "!развод", ".развод", "/развод"}))
 async def cmd_divorce(message: Message) -> None:
     user = message.from_user
     await repo.get_or_create_user(user.id, user.username, user.full_name)
@@ -132,7 +132,7 @@ async def cmd_divorce(message: Message) -> None:
 
 
 @router.message(Command("браки"))
-@router.message(F.text.lower().in_({"браки", "!браки", ".браки"}))
+@router.message(F.text.lower().in_({"браки", "!браки", ".браки", "/браки"}))
 async def cmd_marriages_list(message: Message) -> None:
     marriages = await repo.get_all_marriages(message.chat.id)
     if not marriages:

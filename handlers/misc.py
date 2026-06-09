@@ -1,4 +1,4 @@
-"""Общие команды Chatix b1.7"""
+"""Общие команды Chatix 1.8"""
 from __future__ import annotations
 import logging
 from aiogram import Router, F
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 HELP_TEXT = """
-🤖 <b>Chatix b1.7 | Помощь</b>
+🤖 <b>Chatix 1.8 | Помощь</b>
 
 <b>📋 Общие</b>
 старт/помощь/правила/топ
@@ -53,7 +53,7 @@ HELP_TEXT = """
 /платно — чатики и премиум
 /фричатики — бесплатный чатик (только для 💎 премиум)
 
-<b>✨ Новое в b1.7</b>
+<b>✨ Новое в 1.8</b>
 +название, +описание_чата, закреп, открепить
 очистить [N], кик неактив [дни]
 дуэль [ставка] — вызов на дуэль
@@ -124,14 +124,14 @@ async def cmd_start(message: Message) -> None:
         ])
         await message.answer(
             f"🤖 Привет, <b>{user.full_name}</b>!\n\n"
-            f"Я <b>Chatix b1.7</b> — менеджер чатов с экономикой, играми и модерацией.\n\n"
+            f"Я <b>Chatix 1.8</b> — менеджер чатов с экономикой, играми и модерацией.\n\n"
             f"Напиши /помощь для списка команд или /установка для инструкции.",
             reply_markup=kb
         )
     else:
         await message.reply(
             f"🤖 Привет, <b>{user.full_name}</b>!\n\n"
-            f"Я <b>Chatix b1.7</b> — менеджер чатов с экономикой, играми и модерацией.\n\n"
+            f"Я <b>Chatix 1.8</b> — менеджер чатов с экономикой, играми и модерацией.\n\n"
             f"Напиши /помощь для списка команд."
         )
 
@@ -347,7 +347,7 @@ async def on_new_member(event: ChatMemberUpdated) -> None:
     else:
         text = (
             f"👋 Добро пожаловать, <b>{user.full_name}</b>!\n\n"
-            f"Я <b>Chatix b1.7</b> — менеджер этого чата.\n"
+            f"Я <b>Chatix 1.8</b> — менеджер этого чата.\n"
             f"Напиши /помощь чтобы узнать мои команды, и /установка чтобы добавить меня в свой чат!"
         )
 
