@@ -482,3 +482,74 @@ async def claim_free_chatik(user_id: int) -> tuple[bool, str]:
         rec.last_free_chatik = now
         await s.commit()
         return True, str(rec.checks)
+
+# ─── Заметки ──────────────────────────────────────────────────────────────────
+
+async def add_note(user_id: int, chat_id: int, name: str, content: str) -> None:
+    async with session_scope() as s:
+        existing = await s.execute(
+            select(Note).where(and_(Note.user_id == user_id, Note.chat_id == chat_id, Note.name == name))
+        )
+        note = existing.scalar_one_or_none()
+        if note:
+            note.content = content
+        else:
+            s.add(Note(user_id=user_id, chat_id=chat_id, name=name, content=content))
+        await s.commit()
+
+async def get_note(user_id: int, chat_id: int, name: str):
+    async with session_scope() as s:
+        result = await s.execute(
+            select(Note).where(and_(Note.user_id == user_id, Note.chat_id == chat_id, Note.name == name))
+        )
+        return result.scalar_one_or_none()
+
+async def get_notes(user_id: int, chat_id: int) -> list:
+    async with session_scope() as s:
+        result = await s.execute(
+            select(Note).where(and_(Note.user_id == user_id, Note.chat_id == chat_id))
+        )
+        return list(result.scalars().all())
+
+async def delete_note(user_id: int, chat_id: int, name: str) -> bool:
+    async with session_scope() as s:
+        result = await s.execute(
+            select(Note).where(and_(Note.user_id == user_id, Note.chat_id == chat_id, Note.name == name))
+        )
+        note = result.scalar_one_or_none()
+        if not note:
+            return False
+        await s.delete(note)
+        await s.commit()
+        return True
+
+async def edit_note(user_id: int, chat_id: int, name: str, content: str) -> bool:
+    async with session_scope() as s:
+        result = await s.execute(
+            select(Note).where(and_(Note.user_id == user_id, Note.chat_id == chat_id, Note.name == name))
+        )
+        note = result.scalar_one_or_none()
+        if not note:
+            return False
+        note.content = content
+        await s.commit()
+        return True
+
+# ─── Неактивные пользователи ──────────────────────────────────────────────────
+
+async def get_inactive_users(chat_id: int, since: datetime) -> list[int]:
+    """Возвращает user_id тех, кто не писал в чате с даты since."""
+    async with session_scope() as s:
+        # Те кто ПИСАЛ после since
+        active_result = await s.execute(
+            select(DailyActivity.user_id).where(
+                and_(DailyActivity.chat_id == chat_id, DailyActivity.date >= since)
+            ).distinct()
+        )
+        active_ids = set(row[0] for row in active_result.fetchall())
+        # Все кто вообще есть в этом чате
+        all_result = await s.execute(
+            select(DailyActivity.user_id).where(DailyActivity.chat_id == chat_id).distinct()
+        )
+        all_ids = set(row[0] for row in all_result.fetchall())
+        return list(all_ids - active_ids)
