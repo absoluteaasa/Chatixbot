@@ -1,92 +1,80 @@
-"""
-Модерация Chatix — поддерживает префиксы ! . и без префикса
-"""
+"""Модерация Chatix — ! . / или без префикса"""
 from __future__ import annotations
-import asyncio
-import logging
-import re
+import asyncio, logging, re
 from datetime import datetime, timedelta
 from aiogram import F, Router
-from aiogram.filters import Command
 from aiogram.types import ChatPermissions, Message, ChatMemberUpdated
 from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, JOIN_TRANSITION
 from config import settings
 from database import repo
 from utils.helpers import extract_target, mention_user, parse_duration
+from handlers.banlist import check_banlist_on_join
 
 logger = logging.getLogger(__name__)
 router = Router()
 
-
-def cmd_pattern(name: str) -> str:
-    """Паттерн для команды с префиксами ! . или без"""
-    return rf"^([!.])?{name}(\s|$)"
-
+CMD = r"^[/!.]?"
 
 def admin_only(handler):
     async def wrapper(message: Message, is_admin: bool = False, **kwargs):
         if not is_admin:
-            await message.reply("⛔ Эта команда доступна только администраторам!")
+            await message.reply("⛔ Только для администраторов!")
             return
         return await handler(message, is_admin=is_admin, **kwargs)
     return wrapper
 
-
-def _parse_reason(text: str, cmd: str) -> str:
-    # Убираем префикс !/.
-    clean = re.sub(r'^[!.]', '', text).strip()
+def get_reason(text: str, cmd: str) -> str:
+    clean = re.sub(r'^[/!.]', '', text).strip()
     after = clean[len(cmd):].strip()
     return after if after else "Нет причины"
 
+def fmt_dur(td: timedelta) -> str:
+    t = int(td.total_seconds())
+    if t < 3600: return f"{t//60} мин."
+    if t < 86400: return f"{t//3600} ч."
+    return f"{t//86400} д."
 
-def _format_duration(td: timedelta) -> str:
-    total = int(td.total_seconds())
-    if total < 3600: return f"{total // 60} мин."
-    if total < 86400: return f"{total // 3600} ч."
-    return f"{total // 86400} д."
 
-
-@router.message(F.text.regexp(cmd_pattern("бан"), flags=2))
+@router.message(F.text.regexp(CMD + r"бан(\s|$)", flags=2))
 @admin_only
-async def cmd_ban(message: Message, **_) -> None:
+async def cmd_ban(message: Message, **_):
     target = extract_target(message)
     if not target:
-        await message.reply("ℹ️ Ответь на сообщение пользователя.")
+        await message.reply("ℹ️ Ответь на сообщение.")
         return
-    reason = _parse_reason(message.text, "бан")
+    reason = get_reason(message.text, "бан")
     try:
         await message.chat.ban(target.id)
-        logger.info(f"[BAN] {target.id} в {message.chat.id}")
-        await message.reply(f"🔨 {mention_user(target)} заблокирован.\n📝 Причина: <i>{reason}</i>")
+        await message.reply(f"🔨 {mention_user(target)} заблокирован.\n📝 <i>{reason}</i>")
     except Exception as e:
-        await message.reply(f"❌ Не удалось забанить: {e}")
+        await message.reply(f"❌ {e}")
 
 
-@router.message(F.text.regexp(cmd_pattern("кик"), flags=2))
+@router.message(F.text.regexp(CMD + r"кик(\s|$)", flags=2))
 @admin_only
-async def cmd_kick(message: Message, **_) -> None:
+async def cmd_kick(message: Message, **_):
     target = extract_target(message)
     if not target:
-        await message.reply("ℹ️ Ответь на сообщение пользователя.")
+        await message.reply("ℹ️ Ответь на сообщение.")
         return
-    reason = _parse_reason(message.text, "кик")
+    reason = get_reason(message.text, "кик")
     try:
         await message.chat.ban(target.id)
         await message.chat.unban(target.id)
-        await message.reply(f"👟 {mention_user(target)} выгнан.\n📝 Причина: <i>{reason}</i>")
+        await message.reply(f"👟 {mention_user(target)} выгнан.\n📝 <i>{reason}</i>")
     except Exception as e:
-        await message.reply(f"❌ Не удалось кикнуть: {e}")
+        await message.reply(f"❌ {e}")
 
 
-@router.message(F.text.regexp(cmd_pattern("мут"), flags=2))
+@router.message(F.text.regexp(CMD + r"мут(\s|$)", flags=2))
 @admin_only
-async def cmd_mute(message: Message, **_) -> None:
+async def cmd_mute(message: Message, **_):
     target = extract_target(message)
     if not target:
-        await message.reply("ℹ️ Ответь на сообщение пользователя.")
+        await message.reply("ℹ️ Ответь на сообщение.")
         return
-    text_clean = re.sub(r'^[!.]', '', message.text).strip()
-    parts = text_clean.split(maxsplit=2)
+    clean = re.sub(r'^[/!.]', '', message.text).strip()
+    parts = clean.split(maxsplit=2)
     duration = timedelta(minutes=settings.DEFAULT_MUTE_MINUTES)
     reason = "Нет причины"
     if len(parts) >= 2:
@@ -97,125 +85,112 @@ async def cmd_mute(message: Message, **_) -> None:
         else:
             reason = " ".join(parts[1:])
     import time
-    until_timestamp = int(time.time()) + int(duration.total_seconds())
-    silence = ChatPermissions(can_send_messages=False)
+    until_ts = int(time.time()) + int(duration.total_seconds())
     try:
-        await message.bot.restrict_chat_member(message.chat.id, target.id, permissions=silence, until_date=until_timestamp)
-        await message.reply(f"🔇 {mention_user(target)} заглушён на <b>{_format_duration(duration)}</b>.\n📝 Причина: <i>{reason}</i>")
-        async def notify_unmute():
+        await message.bot.restrict_chat_member(message.chat.id, target.id, permissions=ChatPermissions(can_send_messages=False), until_date=until_ts)
+        await message.reply(f"🔇 {mention_user(target)} заглушён на <b>{fmt_dur(duration)}</b>.\n📝 <i>{reason}</i>")
+        async def notify():
             await asyncio.sleep(duration.total_seconds())
             try:
                 uname = f"@{target.username}" if target.username else mention_user(target)
                 await message.bot.send_message(message.chat.id, f"🔊 {uname}, теперь вы снова можете общаться! Лучше следите за языком..")
             except Exception:
                 pass
-        asyncio.create_task(notify_unmute())
+        asyncio.create_task(notify())
     except Exception as e:
-        await message.reply(f"❌ Не удалось замутить: {e}")
+        await message.reply(f"❌ {e}")
 
 
-@router.message(F.text.regexp(cmd_pattern("анмут"), flags=2))
+@router.message(F.text.regexp(CMD + r"анмут(\s|$)", flags=2))
 @admin_only
-async def cmd_unmute(message: Message, **_) -> None:
+async def cmd_unmute(message: Message, **_):
     target = extract_target(message)
     if not target:
         await message.reply("ℹ️ Ответь на сообщение.")
         return
-    full_perms = ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True)
+    perms = ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True)
     try:
-        await message.bot.restrict_chat_member(message.chat.id, target.id, permissions=full_perms)
-        await message.reply(f"🔊 {mention_user(target)} снова может писать.")
+        await message.bot.restrict_chat_member(message.chat.id, target.id, permissions=perms)
+        await message.reply(f"🔊 {mention_user(target)} размучен.")
     except Exception as e:
-        await message.reply(f"❌ Ошибка: {e}")
+        await message.reply(f"❌ {e}")
 
 
-@router.message(F.text.regexp(cmd_pattern("варн"), flags=2))
+@router.message(F.text.regexp(CMD + r"варн(\s|$)", flags=2))
 @admin_only
-async def cmd_warn(message: Message, **_) -> None:
+async def cmd_warn(message: Message, **_):
     target = extract_target(message)
     if not target:
-        await message.reply("ℹ️ Ответь на сообщение пользователя.")
+        await message.reply("ℹ️ Ответь на сообщение.")
         return
-    reason = _parse_reason(message.text, "варн")
+    reason = get_reason(message.text, "варн")
     await repo.get_or_create_user(target.id, target.username, target.full_name)
-    warn_count = await repo.add_warning(target.id, message.chat.id, reason, message.from_user.id)
-    if warn_count >= settings.MAX_WARNINGS:
+    count = await repo.add_warning(target.id, message.chat.id, reason, message.from_user.id)
+    if count >= settings.MAX_WARNINGS:
         try:
             await message.chat.ban(target.id)
             await repo.clear_warnings(target.id, message.chat.id)
-            await message.reply(f"🔨 {mention_user(target)} получил {warn_count} предупреждений и забанен!")
+            await message.reply(f"🔨 {mention_user(target)} автобан за {count} варна!")
         except Exception as e:
-            await message.reply(f"⚠️ {warn_count}/{settings.MAX_WARNINGS} варнов, но забанить не вышло: {e}")
+            await message.reply(f"⚠️ {count}/{settings.MAX_WARNINGS} варнов: {e}")
     else:
-        await message.reply(f"⚠️ {mention_user(target)} получает предупреждение (<b>{warn_count}/{settings.MAX_WARNINGS}</b>).\n📝 Причина: <i>{reason}</i>")
+        await message.reply(f"⚠️ {mention_user(target)} — варн <b>{count}/{settings.MAX_WARNINGS}</b>.\n📝 <i>{reason}</i>")
 
 
-@router.message(F.text.regexp(cmd_pattern("разбан"), flags=2))
+@router.message(F.text.regexp(CMD + r"разбан(\s|$)", flags=2))
 @admin_only
-async def cmd_unban(message: Message, **_) -> None:
+async def cmd_unban(message: Message, **_):
     target = extract_target(message)
     if not target:
-        await message.reply("ℹ️ Ответь на сообщение пользователя.")
+        await message.reply("ℹ️ Ответь на сообщение.")
         return
     try:
         await message.bot.unban_chat_member(message.chat.id, target.id, only_if_banned=True)
         await message.reply(f"✅ {mention_user(target)} разбанен.")
     except Exception as e:
-        await message.reply(f"❌ Ошибка: {e}")
+        await message.reply(f"❌ {e}")
 
 
-@router.message(F.text.regexp(cmd_pattern("вернуть"), flags=2))
+@router.message(F.text.regexp(CMD + r"вернуть(\s|$)", flags=2))
 @admin_only
-async def cmd_return(message: Message, **_) -> None:
+async def cmd_return(message: Message, **_):
     target = extract_target(message)
     if not target:
-        await message.reply("ℹ️ Ответь на сообщение пользователя.")
+        await message.reply("ℹ️ Ответь на сообщение.")
         return
     try:
         await message.bot.unban_chat_member(message.chat.id, target.id, only_if_banned=True)
         link = await message.bot.create_chat_invite_link(message.chat.id, member_limit=1)
         try:
             await message.bot.send_message(target.id, f"✅ Тебя разбанили в <b>{message.chat.title}</b>!\nСсылка: {link.invite_link}")
-            await message.reply(f"✅ {mention_user(target)} разбанен, ссылка отправлена в личку.")
+            await message.reply(f"✅ {mention_user(target)} разбанен, ссылка отправлена.")
         except Exception:
-            await message.reply(f"✅ {mention_user(target)} разбанен!\nСсылка: {link.invite_link}")
+            await message.reply(f"✅ Разбанен!\nСсылка: {link.invite_link}")
     except Exception as e:
-        await message.reply(f"❌ Ошибка: {e}")
+        await message.reply(f"❌ {e}")
 
 
-# ─── Созвать всех ─────────────────────────────────────────────────────────────
-
-@router.message(F.text.regexp(r"^[!.]?созвать\s+всех", flags=2))
+@router.message(F.text.regexp(CMD + r"созвать\s+всех", flags=2))
 @admin_only
-async def cmd_summon(message: Message, **_) -> None:
-    text = (message.text or "").strip()
-    # Извлекаем сообщение после команды
-    match = re.match(r"^[!.]?созвать\s+всех\s*(.*)", text, re.IGNORECASE | re.DOTALL)
+async def cmd_summon(message: Message, **_):
+    text = message.text or ""
+    match = re.match(r"^[/!.]?созвать\s+всех\s*(.*)", text, re.IGNORECASE | re.DOTALL)
     summon_msg = match.group(1).strip() if match else ""
-
     try:
         members = await message.bot.get_chat_administrators(message.chat.id)
-        mentions = []
-        for m in members:
-            if not m.user.is_bot:
-                mentions.append(mention_user(m.user))
-
-        text_out = "📢 <b>Созыв всех участников!</b>"
+        mentions = [mention_user(m.user) for m in members if not m.user.is_bot]
+        out = "📢 <b>Созыв!</b>"
         if summon_msg:
-            text_out += f"\n\n💬 {summon_msg}"
+            out += f"\n\n💬 {summon_msg}"
         if mentions:
-            text_out += "\n\n" + " ".join(mentions)
-
-        await message.reply(text_out)
-        logger.info(f"[SUMMON] {message.from_user.id} созвал всех в {message.chat.id}")
+            out += "\n\n" + " ".join(mentions)
+        await message.reply(out)
     except Exception as e:
-        await message.reply(f"❌ Ошибка: {e}")
+        await message.reply(f"❌ {e}")
 
-
-# ─── +правила / +приветствие ─────────────────────────────────────────────────
 
 @router.message(F.text.regexp(r"^\+правила", flags=2))
-async def cmd_plus_rules(message: Message, is_admin: bool = False) -> None:
+async def cmd_plus_rules(message: Message, is_admin: bool = False):
     if not is_admin:
         await message.reply("⛔ Только для администраторов!")
         return
@@ -224,11 +199,11 @@ async def cmd_plus_rules(message: Message, is_admin: bool = False) -> None:
         await message.reply("ℹ️ Пример: +правила Не спамить")
         return
     await repo.update_chat_settings(message.chat.id, rules=value)
-    await message.reply("✅ Правила чата обновлены!")
+    await message.reply("✅ Правила обновлены!")
 
 
 @router.message(F.text.regexp(r"^\+приветствие", flags=2))
-async def cmd_plus_welcome(message: Message, is_admin: bool = False) -> None:
+async def cmd_plus_welcome(message: Message, is_admin: bool = False):
     if not is_admin:
         await message.reply("⛔ Только для администраторов!")
         return
@@ -240,24 +215,24 @@ async def cmd_plus_welcome(message: Message, is_admin: bool = False) -> None:
     await message.reply("✅ Приветствие обновлено!")
 
 
-# ─── Приветствие новых участников ─────────────────────────────────────────────
-
 @router.chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
-async def on_new_member(event: ChatMemberUpdated) -> None:
+async def on_new_member(event: ChatMemberUpdated):
     user = event.new_chat_member.user
     await repo.get_or_create_user(user.id, user.username, user.full_name)
+    # Проверяем базу нарушителей
+    banned = await check_banlist_on_join(user.id, event.chat.id, event.bot)
+    if banned:
+        return
     cs = await repo.get_chat_settings(event.chat.id)
-    welcome = cs.welcome_message or f"👋 Добро пожаловать, {mention_user(user)}!\nНапиши /правила для ознакомления с правилами."
+    welcome = cs.welcome_message or f"👋 Добро пожаловать, {mention_user(user)}!\nНапиши правила для ознакомления."
     try:
         await event.bot.send_message(event.chat.id, welcome)
     except Exception as e:
-        logger.warning(f"Не удалось отправить приветствие: {e}")
+        logger.warning(f"Приветствие: {e}")
 
-
-# ─── Автофильтр ───────────────────────────────────────────────────────────────
 
 @router.message(F.text & ~F.text.startswith("/") & ~F.text.startswith("!") & ~F.text.startswith("+") & ~F.text.startswith("-") & ~F.text.startswith("."))
-async def auto_filter(message: Message) -> None:
+async def auto_filter(message: Message):
     if not message.from_user or message.chat.type == "private":
         return
     cs = await repo.get_chat_settings(message.chat.id)

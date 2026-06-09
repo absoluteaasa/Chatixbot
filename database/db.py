@@ -139,3 +139,14 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Таблицы БД созданы/проверены")
+
+
+# ─── Глобальная база нарушителей ─────────────────────────────────────────────
+
+class GlobalBanList(Base):
+    __tablename__ = "global_banlist"
+
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    added_by: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

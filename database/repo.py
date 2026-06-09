@@ -1,5 +1,5 @@
 """
-Репозиторий Chatix — все CRUD операции
+Репозиторий Chatix
 """
 from __future__ import annotations
 import logging
@@ -27,12 +27,12 @@ TREE_NAMES = {
     5: "РП-команды",
     6: "Профиль",
     7: "Управление",
+    8: "Спамбаза",
+    9: "Магазин",
 }
 
 def session_scope():
     return async_session()
-
-# ─── Пользователи ─────────────────────────────────────────────────────────────
 
 async def get_or_create_user(user_id: int, username, full_name: str):
     async with session_scope() as s:
@@ -92,8 +92,6 @@ async def transfer_balance(sender_id: int, receiver_id: int, amount: int) -> boo
         await s.commit()
         return True
 
-# ─── Варны ────────────────────────────────────────────────────────────────────
-
 async def add_warning(user_id: int, chat_id: int, reason: str, issued_by: int) -> int:
     async with session_scope() as s:
         s.add(Warning(user_id=user_id, chat_id=chat_id, reason=reason, issued_by=issued_by))
@@ -116,8 +114,6 @@ async def clear_warnings(user_id: int, chat_id: int) -> None:
             user.warnings = 0
         await s.commit()
 
-# ─── Репутация ────────────────────────────────────────────────────────────────
-
 async def vote_reputation(voter_id: int, target_id: int, chat_id: int, value: int):
     async with session_scope() as s:
         today = datetime.utcnow().date()
@@ -133,8 +129,6 @@ async def vote_reputation(voter_id: int, target_id: int, chat_id: int, value: in
             user.reputation += value
         await s.commit()
         return True, ""
-
-# ─── Топ ──────────────────────────────────────────────────────────────────────
 
 async def get_top_users(limit: int = 10):
     async with session_scope() as s:
@@ -154,8 +148,6 @@ async def get_top_active_today(chat_id: int, limit: int = 10):
             .limit(limit)
         )
         return result.all()
-
-# ─── Браки ────────────────────────────────────────────────────────────────────
 
 async def get_marriage(user_id: int, chat_id: int):
     async with session_scope() as s:
@@ -191,8 +183,6 @@ async def get_all_marriages(chat_id: int):
         result = await s.execute(select(Marriage).where(Marriage.chat_id == chat_id))
         return list(result.scalars().all())
 
-# ─── Настройки чата ───────────────────────────────────────────────────────────
-
 async def get_chat_settings(chat_id: int):
     async with session_scope() as s:
         settings = await s.get(ChatSettings, chat_id)
@@ -216,8 +206,6 @@ async def update_chat_settings(chat_id: int, **kwargs) -> None:
             setattr(settings, key, val)
         await s.commit()
 
-# ─── Профиль ──────────────────────────────────────────────────────────────────
-
 async def get_profile(user_id: int):
     async with session_scope() as s:
         p = await s.get(UserProfile, user_id)
@@ -237,8 +225,6 @@ async def update_profile(user_id: int, **kwargs) -> None:
             setattr(p, k, v)
         p.updated_at = datetime.utcnow()
         await s.commit()
-
-# ─── Активность ───────────────────────────────────────────────────────────────
 
 async def record_daily_activity(user_id: int, chat_id: int) -> None:
     async with session_scope() as s:
@@ -270,8 +256,6 @@ async def get_last_activity(user_id: int, chat_id: int):
         )).order_by(DailyActivity.date.desc()).limit(1))
         return result.scalar_one_or_none()
 
-# ─── Должности ────────────────────────────────────────────────────────────────
-
 async def get_user_role(user_id: int, chat_id: int) -> int:
     async with session_scope() as s:
         result = await s.execute(select(UserRole).where(and_(UserRole.user_id == user_id, UserRole.chat_id == chat_id)))
@@ -292,8 +276,6 @@ async def get_all_roles(chat_id: int):
     async with session_scope() as s:
         result = await s.execute(select(UserRole).where(and_(UserRole.chat_id == chat_id, UserRole.role > 0)).order_by(UserRole.role.desc()))
         return list(result.scalars().all())
-
-# ─── Деревья команд ───────────────────────────────────────────────────────────
 
 async def get_tree(chat_id: int, tree_num: int):
     async with session_scope() as s:
@@ -325,8 +307,6 @@ async def set_tree_min_role(chat_id: int, tree_num: int, min_role: int) -> None:
             s.add(CommandTree(chat_id=chat_id, tree_num=tree_num, min_role=min_role))
         await s.commit()
 
-# ─── Премиум (чеки) ───────────────────────────────────────────────────────────
-
 async def get_checks(user_id: int) -> int:
     async with session_scope() as s:
         rec = await s.get(PremiumBalance, user_id)
@@ -352,8 +332,6 @@ async def spend_checks(user_id: int, amount: int) -> bool:
         await s.commit()
         return True
 
-# ─── Магазин ──────────────────────────────────────────────────────────────────
-
 async def get_shop_items(premium_only: bool = False):
     async with session_scope() as s:
         q = select(ShopItem).where(ShopItem.is_active == True)
@@ -373,7 +351,7 @@ async def buy_item(user_id: int, item_id: int) -> tuple[bool, str]:
     if item.price_checks > 0:
         ok = await spend_checks(user_id, item.price_checks)
         if not ok:
-            return False, f"Недостаточно чеков! Нужно {item.price_checks} 🎫"
+            return False, f"Недостаточно чатиков! Нужно {item.price_checks} 🎫"
     elif item.price_iris > 0:
         async with session_scope() as s:
             user = await s.get(User, user_id)
@@ -392,8 +370,6 @@ async def add_shop_item(name: str, description: str, price_iris: int, price_chec
         s.add(item)
         await s.commit()
         return item
-
-# ─── Спамбаза ─────────────────────────────────────────────────────────────────
 
 async def get_spam_entries(chat_id: int):
     async with session_scope() as s:
@@ -414,3 +390,32 @@ async def remove_spam_entry(chat_id: int, pattern: str) -> bool:
         await s.delete(entry)
         await s.commit()
         return True
+
+# ─── База нарушителей ─────────────────────────────────────────────────────────
+
+async def get_banlist() -> list:
+    async with session_scope() as s:
+        result = await s.execute(select(GlobalBanList))
+        return list(result.scalars().all())
+
+async def add_to_banlist(user_id: int, reason: str, added_by: int) -> bool:
+    async with session_scope() as s:
+        existing = await s.get(GlobalBanList, user_id)
+        if existing:
+            return False
+        s.add(GlobalBanList(user_id=user_id, reason=reason, added_by=added_by))
+        await s.commit()
+        return True
+
+async def remove_from_banlist(user_id: int) -> bool:
+    async with session_scope() as s:
+        entry = await s.get(GlobalBanList, user_id)
+        if not entry:
+            return False
+        await s.delete(entry)
+        await s.commit()
+        return True
+
+async def is_in_banlist(user_id: int) -> bool:
+    async with session_scope() as s:
+        return await s.get(GlobalBanList, user_id) is not None
