@@ -37,6 +37,7 @@ class User(Base):
     bank_balance: Mapped[int] = mapped_column(Integer, default=0)
     bank_deposited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     friend_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    install_bonus_claimed: Mapped[bool] = mapped_column(Boolean, default=False)
 
 class Transfer(Base):
     __tablename__ = "transfers"

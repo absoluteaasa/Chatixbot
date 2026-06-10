@@ -1,4 +1,4 @@
-"""Chatix beta 1.10.5 | Чат-менеджер"""
+"""Chatix beta 1.10.6 | Чат-менеджер"""
 import asyncio, logging
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 async def main():
-    logger.info("🤖 Запуск Chatix beta 1.10.5...")
+    logger.info("🤖 Запуск Chatix beta 1.10.6...")
     await init_db()
     logger.info("✅ БД готова")
     bot = Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -54,7 +54,7 @@ async def main():
     dp.include_router(analytics.router)
 
     await bot.delete_webhook(drop_pending_updates=True)
-    logger.info("🚀 Chatix beta 1.10.5 запущен!")
+    logger.info("🚀 Chatix beta 1.10.6 запущен!")
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:

@@ -60,6 +60,17 @@ async def get_user(user_id: int):
     async with session_scope() as s:
         return await s.get(User, user_id)
 
+async def claim_install_bonus(user_id: int) -> tuple[bool, int]:
+    """Выдаёт 50 ирисок за установку — только 1 раз. Возвращает (success, new_balance)."""
+    async with session_scope() as s:
+        user = await s.get(User, user_id)
+        if not user or user.install_bonus_claimed:
+            return False, user.balance if user else 0
+        user.install_bonus_claimed = True
+        user.balance += 50
+        await s.commit()
+        return True, user.balance
+
 async def update_balance(user_id: int, delta: int) -> int:
     async with session_scope() as s:
         user = await s.get(User, user_id)
