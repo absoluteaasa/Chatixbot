@@ -89,10 +89,12 @@ async def cmd_checks(message: Message) -> None:
 
 @router.message(F.text.regexp(r"^[/!.]?купить_чатики$", flags=2))
 async def cmd_buy_checks(message: Message) -> None:
-    # Перенаправляем в /платно
-    await message.reply(
-        "🎫 Для покупки чатиков и оформления Premium используй /платно"
-    )
+    lines = ["🎫 <b>Покупка чатиков за звёзды Telegram</b>\n"]
+    kb = []
+    for i, (checks, stars, label) in enumerate(CHECKS_PACKAGES, 1):
+        lines.append(f"{i}. {label}: <b>{checks} чатиков</b> за ⭐ {stars} звёзд")
+        kb.append([InlineKeyboardButton(text=f"{label}: {checks} чатиков за ⭐{stars}", callback_data=f"buy_checks:{i-1}")])
+    await message.reply("\n".join(lines), reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
 
 @router.callback_query(F.data.startswith("buy_checks:"))

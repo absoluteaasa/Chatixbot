@@ -179,21 +179,12 @@ async def cmd_summon(message: Message, **_):
     try:
         members = await message.bot.get_chat_administrators(message.chat.id)
         mentions = [mention_user(m.user) for m in members if not m.user.is_bot]
-        if not mentions:
-            await message.reply("👥 Нет участников для созыва.")
-            return
-        # Собираем упоминания в одно сообщение, разбиваем только если > 4096 символов
-        header = "📢 <b>Созыв!</b>"
+        out = "📢 <b>Созыв!</b>"
         if summon_msg:
-            header += f"\n\n💬 {summon_msg}\n\n"
-        else:
-            header += "\n\n"
-        # Упаковываем по ~25 упоминаний на сообщение чтобы не превышать лимит
-        chunk_size = 25
-        chunks = [mentions[i:i+chunk_size] for i in range(0, len(mentions), chunk_size)]
-        for i, chunk in enumerate(chunks):
-            prefix = header if i == 0 else ""
-            await message.answer(prefix + " ".join(chunk))
+            out += f"\n\n💬 {summon_msg}"
+        if mentions:
+            out += "\n\n" + " ".join(mentions)
+        await message.reply(out)
     except Exception as e:
         await message.reply(f"❌ {e}")
 
