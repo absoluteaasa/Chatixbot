@@ -1,4 +1,4 @@
-"""Chatix | Чат-менеджер"""
+"""Chatix 2.0 | Чат-менеджер"""
 import asyncio, logging
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
@@ -6,7 +6,11 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import settings
 from database.db import init_db
-from handlers import moderation, economy, reputation, marriage, misc, profile, roles, shop, spam, top, banlist
+from handlers import (
+    moderation, economy, reputation, marriage, misc,
+    profile, roles, shop, spam, top, banlist, chat_manage,
+    levels, bank, auction, clans, social, tickets, analytics,
+)
 from middlewares.admin import AdminMiddleware
 from middlewares.antiflood import AntiFloodMiddleware
 
@@ -19,14 +23,17 @@ logger = logging.getLogger(__name__)
 
 
 async def main():
-    logger.info("🤖 Запуск Chatix...")
+    logger.info("🤖 Запуск Chatix 2.0...")
     await init_db()
     logger.info("✅ БД готова")
     bot = Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=MemoryStorage())
     dp.message.middleware(AntiFloodMiddleware(limit=5, window=10))
     dp.message.middleware(AdminMiddleware())
+
+    # Порядок важен: misc первым (new_member, платежи)
     dp.include_router(misc.router)
+    dp.include_router(chat_manage.router)
     dp.include_router(roles.router)
     dp.include_router(banlist.router)
     dp.include_router(shop.router)
@@ -37,10 +44,19 @@ async def main():
     dp.include_router(marriage.router)
     dp.include_router(profile.router)
     dp.include_router(moderation.router)
+    # Новые ДК 2.0
+    dp.include_router(levels.router)
+    dp.include_router(bank.router)
+    dp.include_router(auction.router)
+    dp.include_router(clans.router)
+    dp.include_router(social.router)
+    dp.include_router(tickets.router)
+    dp.include_router(analytics.router)
+
     await bot.delete_webhook(drop_pending_updates=True)
-    logger.info("🚀 Chatix запущен!")
+    logger.info("🚀 Chatix 2.0 запущен!")
     try:
-        await dp.start_polling(bot)
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
         await bot.session.close()
 

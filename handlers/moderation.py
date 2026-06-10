@@ -179,12 +179,21 @@ async def cmd_summon(message: Message, **_):
     try:
         members = await message.bot.get_chat_administrators(message.chat.id)
         mentions = [mention_user(m.user) for m in members if not m.user.is_bot]
-        out = "📢 <b>Созыв!</b>"
+        if not mentions:
+            await message.reply("👥 Нет участников для созыва.")
+            return
+        # Собираем упоминания в одно сообщение, разбиваем только если > 4096 символов
+        header = "📢 <b>Созыв!</b>"
         if summon_msg:
-            out += f"\n\n💬 {summon_msg}"
-        if mentions:
-            out += "\n\n" + " ".join(mentions)
-        await message.reply(out)
+            header += f"\n\n💬 {summon_msg}\n\n"
+        else:
+            header += "\n\n"
+        # Упаковываем по ~25 упоминаний на сообщение чтобы не превышать лимит
+        chunk_size = 25
+        chunks = [mentions[i:i+chunk_size] for i in range(0, len(mentions), chunk_size)]
+        for i, chunk in enumerate(chunks):
+            prefix = header if i == 0 else ""
+            await message.answer(prefix + " ".join(chunk))
     except Exception as e:
         await message.reply(f"❌ {e}")
 
@@ -235,7 +244,19 @@ async def on_new_member(event: ChatMemberUpdated):
 async def auto_filter(message: Message):
     if not message.from_user or message.chat.type == "private":
         return
+    await repo.get_or_create_user(message.from_user.id, message.from_user.username, message.from_user.full_name)
     cs = await repo.get_chat_settings(message.chat.id)
+
+    # ── Медленный режим ───────────────────────────────────────────────────────
+    if cs.slow_mode_seconds > 0:
+        can_send, _ = await repo.check_slow_mode(message.from_user.id, message.chat.id, cs.slow_mode_seconds)
+        if not can_send:
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            return
+
     text_lower = (message.text or "").lower()
     forbidden = set(settings.FORBIDDEN_WORDS)
     if cs.forbidden_words:
@@ -257,6 +278,41 @@ async def auto_filter(message: Message):
             except Exception:
                 pass
             return
-    await repo.get_or_create_user(message.from_user.id, message.from_user.username, message.from_user.full_name)
-    await repo.increment_messages(message.from_user.id)
-    await repo.record_daily_activity(message.from_user.id, message.chat.id)
+
+    # ── XP / уровень ──────────────────────────────────────────────────────────
+    xp, level, leveled_up = await repo.add_xp(message.from_user.id)
+    if leveled_up:
+        from database.repo import LEVEL_NAMES
+        level_name = LEVEL_NAMES.get(min(level, 10), f"Уровень {level}")
+        from utils.helpers import mention_user as _mention
+        try:
+            await message.answer(
+                f"🎉 {_mention(message.from_user)} достиг <b>{level_name} (ур. {level})</b>!"
+            )
+        except Exception:
+            pass
+
+    # ── Стрик ─────────────────────────────────────────────────────────────────
+    streak, is_new_day = await repo.update_streak(message.from_user.id)
+    if is_new_day and streak in (7, 14, 30, 60, 100):
+        await repo.award_achievement(message.from_user.id, f"streak_{streak}")
+
+    # ── Квест: сообщения ──────────────────────────────────────────────────────
+    completed, reward = await repo.progress_quest(message.from_user.id, message.chat.id, "messages_20")
+    if completed and reward:
+        await repo.update_balance(message.from_user.id, reward)
+        try:
+            from utils.helpers import mention_user as _mention
+            await message.answer(f"📋 {_mention(message.from_user)}, квест выполнен! +{reward} 🍬")
+        except Exception:
+            pass
+
+    # ── Ачивки по статистике ──────────────────────────────────────────────────
+    db_user = await repo.get_user(message.from_user.id)
+    if db_user:
+        if db_user.messages_count == 1:
+            await repo.award_achievement(message.from_user.id, "first_message")
+        elif db_user.messages_count == 100:
+            await repo.award_achievement(message.from_user.id, "messages_100")
+        elif db_user.messages_count == 1000:
+            await repo.award_achievement(message.from_user.id, "messages_1000")

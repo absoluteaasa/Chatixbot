@@ -1,22 +1,12 @@
 """
-Модуль браков:
-  /брак [ответ на сообщение] — предложение руки и сердца
-  /развод — расторжение брака
-  /браки — список браков чата
-FSM: ожидание согласия второй стороны в течение 60 секунд.
+Модуль браков Chatix b1.7
+/брак, /развод, /браки
 """
-
 from __future__ import annotations
-
-import asyncio
-import logging
-
+import asyncio, logging
 from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
-
 from config import settings
 from database import repo
 from utils.helpers import format_balance, mention_user
@@ -24,47 +14,36 @@ from utils.helpers import format_balance, mention_user
 logger = logging.getLogger(__name__)
 router = Router()
 
-PROPOSAL_TIMEOUT = 60  # секунд
+PROPOSAL_TIMEOUT = 60
 
+# {(chat_id, target_id): (proposer_id, task)}
+_pending_proposals: dict[tuple[int, int], tuple[int, asyncio.Task]] = {}
 
-class MarriageStates(StatesGroup):
-    waiting_for_consent = State()
-
-
-# Хранит активные предложения: {(chat_id, target_id): proposer_id}
-_pending_proposals: dict[tuple[int, int], int] = {}
-
-
-# ─── Предложение брака ────────────────────────────────────────────────────────
 
 @router.message(Command("брак"))
+@router.message(F.text.lower().in_({"брак", "!брак", ".брак", "/брак"}))
 async def cmd_propose(message: Message) -> None:
-    """
-    /брак — ответ на сообщение пользователя, которому делаешь предложение.
-    """
     proposer = message.from_user
+    await repo.get_or_create_user(proposer.id, proposer.username, proposer.full_name)
 
     if not message.reply_to_message or not message.reply_to_message.from_user:
         await message.reply(
             "💍 Ответь на сообщение пользователя, которому хочешь сделать предложение!\n"
-            "Использование: <code>/брак</code> (в ответ на сообщение)"
+            "Пример: ответь на сообщение и напиши <b>брак</b>"
         )
         return
 
     target = message.reply_to_message.from_user
-
     if target.id == proposer.id:
         await message.reply("🤨 На себе жениться нельзя...")
         return
-
     if target.is_bot:
         await message.reply("🤖 Боты не вступают в браки!")
         return
 
-    # Проверяем существующие браки
     proposer_marriage = await repo.get_marriage(proposer.id, message.chat.id)
     if proposer_marriage:
-        await message.reply(f"💔 Ты уже в браке! Сначала напиши /развод.")
+        await message.reply("💔 Ты уже в браке! Сначала напиши <b>развод</b>.")
         return
 
     target_marriage = await repo.get_marriage(target.id, message.chat.id)
@@ -72,14 +51,11 @@ async def cmd_propose(message: Message) -> None:
         await message.reply(f"💔 {mention_user(target)} уже в браке!")
         return
 
-    # Проверяем, нет ли дублирующего предложения
     key = (message.chat.id, target.id)
     if key in _pending_proposals:
         await message.reply("⏳ Этому пользователю уже сделано предложение. Подожди ответа.")
         return
 
-    # Проверяем баланс
-    await repo.get_or_create_user(proposer.id, proposer.username, proposer.full_name)
     db_proposer = await repo.get_user(proposer.id)
     if not db_proposer or db_proposer.balance < settings.MARRIAGE_COST:
         await message.reply(
@@ -88,110 +64,83 @@ async def cmd_propose(message: Message) -> None:
         )
         return
 
-    _pending_proposals[key] = proposer.id
+    async def _timeout():
+        await asyncio.sleep(PROPOSAL_TIMEOUT)
+        if key in _pending_proposals:
+            del _pending_proposals[key]
+            try:
+                await message.answer(
+                    f"⌛ Предложение {mention_user(proposer)} → {mention_user(target)} истекло."
+                )
+            except Exception:
+                pass
+
+    task = asyncio.create_task(_timeout())
+    _pending_proposals[key] = (proposer.id, task)
 
     await message.reply(
         f"💍 {mention_user(proposer)} делает предложение {mention_user(target)}!\n\n"
-        f"💌 {mention_user(target)}, ты согласен(а)? Напиши <b>да</b> или <b>нет</b> в течение {PROPOSAL_TIMEOUT} секунд.\n"
+        f"💌 {mention_user(target)}, ты согласен(а)?\n"
+        f"Напиши <b>да</b> или <b>нет</b> в течение {PROPOSAL_TIMEOUT} секунд.\n"
         f"💰 Стоимость: {format_balance(settings.MARRIAGE_COST)}"
     )
 
-    # Автоотмена через таймаут
-    await asyncio.sleep(PROPOSAL_TIMEOUT)
-    if key in _pending_proposals:
-        del _pending_proposals[key]
-        try:
-            await message.answer(
-                f"⌛ Предложение {mention_user(proposer)} к {mention_user(target)} истекло."
-            )
-        except Exception:
-            pass
-
-
-# ─── Ответ на предложение ─────────────────────────────────────────────────────
 
 @router.message(F.text.lower().in_({"да", "нет"}))
 async def cmd_marriage_response(message: Message) -> None:
     user = message.from_user
-    chat_id = message.chat.id
-
-    key = (chat_id, user.id)
+    key = (message.chat.id, user.id)
     if key not in _pending_proposals:
-        return  # Не ждём ответа от этого пользователя
-
-    proposer_id = _pending_proposals.pop(key)
-    proposer = await repo.get_user(proposer_id)
-
-    if not proposer:
-        await message.reply("❌ Предложивший пользователь не найден.")
         return
 
-    if (message.text or "").lower() == "нет":
-        await message.reply(
-            f"💔 {mention_user(user)} отказал(а)..."
-        )
-        return
+    proposer_id, task = _pending_proposals.pop(key)
+    task.cancel()
 
-    # Согласие — оформляем брак
     await repo.get_or_create_user(user.id, user.username, user.full_name)
 
-    # Списываем ириски с предложившего
-    success = await repo.update_balance(proposer_id, -settings.MARRIAGE_COST)
+    if (message.text or "").lower() == "нет":
+        await message.reply(f"💔 {mention_user(user)} отказал(а)...")
+        return
 
-    # Имитируем mention через фиктивный объект
-    class _FakeUser:
-        def __init__(self, u):
-            self.id = u.id
-            self.full_name = u.full_name
-            self.username = u.username
+    proposer_db = await repo.get_user(proposer_id)
+    if not proposer_db or proposer_db.balance < settings.MARRIAGE_COST:
+        await message.reply("❌ У предложившего не хватает ирисок!")
+        return
 
-    proposer_mention = f'<a href="tg://user?id={proposer_id}">{proposer.full_name or proposer.username or proposer_id}</a>'
+    await repo.update_balance(proposer_id, -settings.MARRIAGE_COST)
+    await repo.create_marriage(proposer_id, user.id, message.chat.id)
 
-    marriage = await repo.create_marriage(proposer_id, user.id, chat_id)
-
-    logger.info(f"[MARRIAGE] {proposer_id} + {user.id} в чате {chat_id}")
+    proposer_mention = f'<a href="tg://user?id={proposer_id}">{proposer_db.full_name or proposer_db.username or proposer_id}</a>'
+    logger.info(f"[MARRIAGE] {proposer_id} + {user.id} в чате {message.chat.id}")
     await message.reply(
-        f"💒 Поздравляем! {proposer_mention} и {mention_user(user)} теперь женаты! 💕\n\n"
+        f"💒 Поздравляем! {proposer_mention} и {mention_user(user)} теперь женаты! 💕\n"
         f"🎉 Желаем счастья и любви!"
     )
 
 
-# ─── Развод ───────────────────────────────────────────────────────────────────
-
 @router.message(Command("развод"))
+@router.message(F.text.lower().in_({"развод", "!развод", ".развод", "/развод"}))
 async def cmd_divorce(message: Message) -> None:
     user = message.from_user
     await repo.get_or_create_user(user.id, user.username, user.full_name)
-
     success = await repo.divorce(user.id, message.chat.id)
-
     if success:
         logger.info(f"[DIVORCE] {user.id} в чате {message.chat.id}")
-        await message.reply(
-            f"💔 {mention_user(user)} подал(а) на развод...\n"
-            f"Брак расторгнут. Мы скорбим."
-        )
+        await message.reply(f"💔 {mention_user(user)} подал(а) на развод. Брак расторгнут.")
     else:
-        await message.reply(f"🤷 {mention_user(user)}, ты не в браке в этом чате.")
+        await message.reply("💭 Ты не состоишь в браке.")
 
-
-# ─── Список браков ────────────────────────────────────────────────────────────
 
 @router.message(Command("браки"))
+@router.message(F.text.lower().in_({"браки", "!браки", ".браки", "/браки"}))
 async def cmd_marriages_list(message: Message) -> None:
     marriages = await repo.get_all_marriages(message.chat.id)
-
     if not marriages:
-        await message.reply("💔 В этом чате пока нет браков. Будь первым!")
+        await message.reply("💭 В этом чате пока нет браков.")
         return
-
-    lines = ["💒 <b>Браки чата:</b>\n"]
+    lines = ["💑 <b>Браки чата:</b>\n"]
     for i, m in enumerate(marriages, 1):
-        u1 = await repo.get_user(m.user1_id)
-        u2 = await repo.get_user(m.user2_id)
-        name1 = u1.full_name or u1.username if u1 else str(m.user1_id)
-        name2 = u2.full_name or u2.username if u2 else str(m.user2_id)
-        date = m.created_at.strftime("%d.%m.%Y")
-        lines.append(f"{i}. 💕 {name1} & {name2} <i>(с {date})</i>")
-
+        u1 = f'<a href="tg://user?id={m.user1_id}">{m.user1_id}</a>'
+        u2 = f'<a href="tg://user?id={m.user2_id}">{m.user2_id}</a>'
+        lines.append(f"{i}. {u1} 💕 {u2}")
     await message.reply("\n".join(lines))
