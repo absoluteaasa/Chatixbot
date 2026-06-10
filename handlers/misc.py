@@ -1,4 +1,4 @@
-"""Общие команды Chatix 2.0"""
+"""Общие команды Chatix beta 1.10.5 — кнопочная помощь и ДК"""
 from __future__ import annotations
 import logging
 from aiogram import Router, F
@@ -13,81 +13,28 @@ from database import repo
 logger = logging.getLogger(__name__)
 router = Router()
 
-HELP_TEXT = """
-🤖 <b>Chatix 2.0 | Помощь</b>
+# ══════════════════════════════════════════════════════════════════════════════
+# ДАННЫЕ ДК
+# ══════════════════════════════════════════════════════════════════════════════
 
-<b>📋 Общие</b>
-старт/помощь/правила/топ
-кто я, кто ты (ответ), кто админ
-бот — проверка работы
-
-<b>🛡️ Модерация [ДК 1]</b>
-бан, кик, мут [10m/2h/1d], анмут, варн
-разбан, вернуть, созвать всех
-
-<b>💰 Экономика и игры [ДК 2]</b>
-баланс, бонус, перевод [сумма]
-казино [ставка], кости [ставка], ставка [сумма]
-
-<b>💑 Браки [ДК 3]</b>
-брак, развод, браки
-
-<b>⭐ Репутация [ДК 4]</b>
-+ или - в ответ, топ
-
-<b>🎭 РП-команды [ДК 5]</b>
-!обнять, !поцеловать, !ударить, !погладить, !укусить, !подмигнуть
-
-<b>👤 Профиль [ДК 6]</b>
-кто я, кто ты, +описание, +имя, +возраст, +город, +страна, +хобби
-
-<b>⚙️ Управление [ДК 7]</b>
-кто админ, повысить, понизить, передать @юзернейм
-+правила, +приветствие
-
-<b>🚫 Спамбаза [ДК 8]</b>
-спам, спам+ [слово], спам- [слово]
-
-<b>🛒 Магазин [ДК 9]</b>
-магазин, купить [ID], инвентарь
-чатики, купить_чатики
-Кнопки: ➕ Добавить товар | 💎 Добавить премиум
-
-<b>📈 Уровни и ачивки [ДК 10]</b>
-уровень, ачивки, квесты
-XP за сообщения, уведомление при повышении, стрики
-
-<b>🏦 Банк и работа [ДК 11]</b>
-банк, вложить [сумма] [дни], снять [ID]
-работать (cooldown 4ч), ограбить (reply)
-
-<b>🔨 Аукцион [ДК 12]</b>
-аукцион, создать_лот [название] [цена] [часы]
-ставить [ID] [сумма]
-
-<b>🏰 Кланы [ДК 13]</b>
-клан, кланы, создать_клан [название]
-вступить_клан [название], выйти_клан
-
-<b>💚 Дружба и подарки [ДК 14]</b>
-добавить_друга, принять_друга, друзья
-запросы, подарить [ID], инвентарь
-
-<b>🚨 Тикеты [ДК 15]</b>
-жалоба [причина] (reply), тикеты
-закрыть_тикет [ID]
-
-<b>📊 Аналитика [ДК 16]</b>
-статистика, медленный [сек], лог [chat_id]
-
-<b>📊 Топ активности</b>
-!топ, !топ вся, !топ [N]
-
-<b>🔑 ДК управление (владелец)</b>
-!дк — список, +дк N / -дк N — вкл/выкл
-
-<i>Команды работают с ! . / или без префикса</i>
-"""
+DK_DATA = {
+    1:  ("🛡️", "Модерация",        "бан, кик, мут [10m/2h/1d], анмут\nварн, разбан, вернуть\nсозвать всех [сообщение]"),
+    2:  ("💰", "Экономика и игры", "баланс, бонус, перевод [сумма]\nказино [ставка] [red|black|green|even|odd|0-36]\nкости [ставка], ставка [сумма] [орёл|решка]"),
+    3:  ("💑", "Браки",            "брак, развод, браки"),
+    4:  ("⭐", "Репутация",        "+ или - в ответ на сообщение\nтоп — топ репутации/богачей/активных"),
+    5:  ("🎭", "РП-команды",       "обнять, поцеловать, ударить\nпогладить, укусить, подмигнуть"),
+    6:  ("👤", "Профиль",          "кто я, кто ты (ответ)\n+описание, +имя, +возраст\n+город, +страна, +хобби"),
+    7:  ("⚙️", "Управление",       "кто админ, повысить, понизить\nпередать @юзернейм\n+правила, +приветствие"),
+    8:  ("🚫", "Спамбаза",         "спам — просмотр\nспам+ [слово], спам- [слово]"),
+    9:  ("🛒", "Магазин",          "магазин, купить [ID], инвентарь\nчатики, купить_чатики\nКнопки в магазине: ➕ товар | 💎 премиум"),
+    10: ("📈", "Уровни и ачивки",  "уровень, ачивки, квесты\nXP за сообщения, стрики"),
+    11: ("🏦", "Банк и работа",    "банк, вложить [сумма] [дни], снять [ID]\nработать (cooldown 4ч), ограбить (reply)"),
+    12: ("🔨", "Аукцион",          "аукцион, создать_лот [название] [цена] [часы]\nставить [ID] [сумма]"),
+    13: ("🏰", "Кланы",            "клан, кланы, создать_клан [название]\nвступить_клан [название], выйти_клан"),
+    14: ("💚", "Дружба и подарки", "добавить_друга, принять_друга\nдрузья, запросы\nподарить [ID], инвентарь"),
+    15: ("🚨", "Тикеты",           "жалоба [причина] (reply)\nтикеты, закрыть_тикет [ID]"),
+    16: ("📊", "Аналитика",        "статистика\nмедленный [сек]\nлог [chat_id]"),
+}
 
 INSTALL_TEXT = """
 📦 <b>Как добавить Chatix в свой чат</b>
@@ -96,8 +43,8 @@ INSTALL_TEXT = """
 Открой информацию о группе → Участники → Добавить участника → найди @chatixcm_bot
 
 <b>Шаг 2 — Дай права администратора</b>
-Нажми на бота в списке → Назначить администратором
-Включи права:
+Нажми на бота → Назначить администратором
+Включи:
 • Удаление сообщений
 • Бан пользователей
 • Ограничение пользователей
@@ -106,29 +53,107 @@ INSTALL_TEXT = """
 <b>Шаг 3 — Готово!</b>
 Напиши в чате <b>старт</b> — бот поприветствует всех 🎉
 
-<b>Полезные команды после установки:</b>
-• <b>+правила</b> [текст] — задать правила чата
-• <b>+приветствие</b> [текст] — задать приветствие
-• <b>помощь</b> — полный список команд
-
 <i>За установку Chatix в чат ты получишь <b>+50 ирисок</b>! 🍬</i>
 """
 
 PREMIUM_INFO_TEXT = """
-💎 <b>Chatix Premium — что открывает подписка</b>
+💎 <b>Chatix Premium</b>
 
-🎫 <b>/фричатики</b> — 1 бесплатный чатик каждый день
-🛍️ <b>Доступ к премиум-товарам</b> в магазине (помечены 💎)
-⚡ <b>Приоритет</b> в топе и повышенный множитель репутации <i>(скоро)</i>
-🎨 <b>Цветной профиль</b> с премиум-значком 💎 <i>(скоро)</i>
-🎰 <b>Двойные выигрыши</b> в казино по пятницам <i>(скоро)</i>
-🔔 <b>Уведомления об активности чата</b> в личку <i>(скоро)</i>
+🎫 /фричатики — 1 бесплатный чатик каждый день
+🛍️ Доступ к премиум-товарам в магазине (💎)
+⚡ Приоритет в топе <i>(скоро)</i>
+🎨 Цветной профиль с значком 💎 <i>(скоро)</i>
+🎰 Двойные выигрыши по пятницам <i>(скоро)</i>
 
-💰 Стоимость: <b>50 звёзд Telegram ⭐</b> на 30 дней
-
-<i>Нажми кнопку ниже чтобы оформить подписку!</i>
+💰 Стоимость: <b>50 звёзд Telegram ⭐</b> / 30 дней
 """
 
+CHECKS_PACKAGES = [
+    (5,  10, "Мини"),
+    (15, 25, "Стартовый"),
+    (50, 75, "Популярный 🔥"),
+]
+
+# ══════════════════════════════════════════════════════════════════════════════
+# КЛАВИАТУРЫ
+# ══════════════════════════════════════════════════════════════════════════════
+
+def kb_main_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="📋 Команды", callback_data="help_menu"),
+            InlineKeyboardButton(text="🌲 ДК", callback_data="dk_menu"),
+        ],
+        [
+            InlineKeyboardButton(text="📦 Установка", callback_data="show_install"),
+            InlineKeyboardButton(text="💎 Премиум", callback_data="show_premium_info"),
+        ],
+    ])
+
+
+def kb_help_menu() -> InlineKeyboardMarkup:
+    """Главное меню помощи — категории ДК по 2 в ряд."""
+    rows = []
+    items = list(DK_DATA.items())
+    for i in range(0, len(items), 2):
+        row = []
+        for dk_num, (emoji, name, _) in items[i:i+2]:
+            row.append(InlineKeyboardButton(
+                text=f"{emoji} ДК {dk_num}",
+                callback_data=f"dk_info:{dk_num}"
+            ))
+        rows.append(row)
+    rows.append([
+        InlineKeyboardButton(text="🔑 ДК управление", callback_data="dk_control"),
+        InlineKeyboardButton(text="⬅️ Назад", callback_data="main_menu"),
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def kb_dk_menu(chat_id: int | None = None) -> InlineKeyboardMarkup:
+    """Меню управления ДК — список кнопок."""
+    rows = []
+    items = list(DK_DATA.items())
+    for i in range(0, len(items), 2):
+        row = []
+        for dk_num, (emoji, name, _) in items[i:i+2]:
+            row.append(InlineKeyboardButton(
+                text=f"{emoji} {dk_num}. {name}",
+                callback_data=f"dk_toggle:{dk_num}"
+            ))
+        rows.append(row)
+    rows.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="main_menu")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def kb_dk_info(dk_num: int) -> InlineKeyboardMarkup:
+    """Кнопки внутри страницы ДК."""
+    prev_num = dk_num - 1 if dk_num > 1 else len(DK_DATA)
+    next_num = dk_num + 1 if dk_num < len(DK_DATA) else 1
+    prev_emoji = DK_DATA[prev_num][0]
+    next_emoji = DK_DATA[next_num][0]
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text=f"◀️ {prev_emoji} ДК {prev_num}", callback_data=f"dk_info:{prev_num}"),
+            InlineKeyboardButton(text=f"ДК {next_num} {next_emoji} ▶️", callback_data=f"dk_info:{next_num}"),
+        ],
+        [InlineKeyboardButton(text="⬅️ Все ДК", callback_data="help_menu")],
+    ])
+
+
+def kb_dk_toggle(dk_num: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Включить", callback_data=f"dk_enable:{dk_num}"),
+            InlineKeyboardButton(text="❌ Выключить", callback_data=f"dk_disable:{dk_num}"),
+        ],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="dk_menu")],
+    ])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ХЭНДЛЕРЫ
+# ══════════════════════════════════════════════════════════════════════════════
 
 @router.message(CommandStart())
 @router.message(Command("start"))
@@ -136,38 +161,146 @@ PREMIUM_INFO_TEXT = """
 async def cmd_start(message: Message) -> None:
     user = message.from_user
     await repo.get_or_create_user(user.id, user.username, user.full_name)
-    # В личке — полное приветствие с кнопками
     if message.chat.type == "private":
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📋 Список команд", callback_data="show_help")],
-            [InlineKeyboardButton(text="📦 Как установить бота в чат", callback_data="show_install")],
-            [InlineKeyboardButton(text="💎 Премиум", callback_data="show_premium_info")],
-        ])
         await message.answer(
             f"🤖 Привет, <b>{user.full_name}</b>!\n\n"
-            f"Я <b>Chatix 2.0</b> — менеджер чатов с экономикой, играми и модерацией.\n\n"
-            f"Напиши /помощь для списка команд или /установка для инструкции.",
-            reply_markup=kb
+            f"Я <b>Chatix beta 1.10.5</b> — менеджер чатов с экономикой, играми и модерацией.\n\n"
+            f"Выбери раздел:",
+            reply_markup=kb_main_menu()
         )
     else:
         await message.reply(
             f"🤖 Привет, <b>{user.full_name}</b>!\n\n"
-            f"Я <b>Chatix 2.0</b> — менеджер чатов с экономикой, играми и модерацией.\n\n"
-            f"Напиши /помощь для списка команд."
+            f"Я <b>Chatix beta 1.10.5</b> — менеджер чатов.\n"
+            f"Напиши <b>помощь</b> для списка команд.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="📋 Команды", callback_data="help_menu"),
+                InlineKeyboardButton(text="🌲 ДК", callback_data="dk_menu"),
+            ]])
         )
 
 
 @router.message(Command("помощь", "help"))
 @router.message(F.text.lower().in_({"помощь", "!помощь", ".помощь", "help", "!help", ".help"}))
 async def cmd_help(message: Message) -> None:
-    await message.reply(HELP_TEXT)
+    await message.reply(
+        "🤖 <b>Chatix beta 1.10.5 | Помощь</b>\n\nВыбери раздел:",
+        reply_markup=kb_help_menu()
+    )
 
 
-@router.callback_query(F.data == "show_help")
-async def cb_show_help(call: CallbackQuery) -> None:
+# ── Главное меню ──────────────────────────────────────────────────────────────
+
+@router.callback_query(F.data == "main_menu")
+async def cb_main_menu(call: CallbackQuery) -> None:
     await call.answer()
-    await call.message.answer(HELP_TEXT)
+    await call.message.edit_text(
+        "🤖 <b>Chatix beta 1.10.5</b>\n\nВыбери раздел:",
+        reply_markup=kb_main_menu()
+    )
 
+
+@router.callback_query(F.data == "help_menu")
+async def cb_help_menu(call: CallbackQuery) -> None:
+    await call.answer()
+    await call.message.edit_text(
+        "📋 <b>Команды по разделам</b>\n\nВыбери ДК:",
+        reply_markup=kb_help_menu()
+    )
+
+
+# ── Страница конкретного ДК ───────────────────────────────────────────────────
+
+@router.callback_query(F.data.startswith("dk_info:"))
+async def cb_dk_info(call: CallbackQuery) -> None:
+    await call.answer()
+    dk_num = int(call.data.split(":")[1])
+    emoji, name, commands = DK_DATA[dk_num]
+    await call.message.edit_text(
+        f"{emoji} <b>ДК {dk_num} — {name}</b>\n\n"
+        f"<code>{commands}</code>\n\n"
+        f"<i>Команды работают с ! . / или без префикса</i>",
+        reply_markup=kb_dk_info(dk_num)
+    )
+
+
+# ── ДК управление (список для вкл/выкл) ──────────────────────────────────────
+
+@router.callback_query(F.data == "dk_menu")
+async def cb_dk_menu(call: CallbackQuery) -> None:
+    await call.answer()
+    await call.message.edit_text(
+        "🌲 <b>Управление ДК</b>\n\nНажми на ДК чтобы включить/выключить:",
+        reply_markup=kb_dk_menu()
+    )
+
+
+@router.callback_query(F.data.startswith("dk_toggle:"))
+async def cb_dk_toggle(call: CallbackQuery) -> None:
+    await call.answer()
+    dk_num = int(call.data.split(":")[1])
+    emoji, name, _ = DK_DATA[dk_num]
+    tree = await repo.get_tree(call.message.chat.id, dk_num)
+    status = "✅ включено" if tree.enabled else "❌ выключено"
+    await call.message.edit_text(
+        f"{emoji} <b>ДК {dk_num} — {name}</b>\n\n"
+        f"Текущий статус: <b>{status}</b>\n\n"
+        f"Что сделать?",
+        reply_markup=kb_dk_toggle(dk_num)
+    )
+
+
+@router.callback_query(F.data.startswith("dk_enable:"))
+async def cb_dk_enable(call: CallbackQuery) -> None:
+    dk_num = int(call.data.split(":")[1])
+    from handlers.roles import _get_effective_role
+    role = await _get_effective_role(call.message)
+    if role < 5:
+        await call.answer("⛔ Только Владелец!", show_alert=True)
+        return
+    await repo.set_tree_enabled(call.message.chat.id, dk_num, True)
+    emoji, name, _ = DK_DATA[dk_num]
+    await call.answer(f"✅ ДК {dk_num} включено!", show_alert=True)
+    await call.message.edit_text(
+        f"{emoji} <b>ДК {dk_num} — {name}</b>\n\nСтатус: <b>✅ включено</b>",
+        reply_markup=kb_dk_toggle(dk_num)
+    )
+
+
+@router.callback_query(F.data.startswith("dk_disable:"))
+async def cb_dk_disable(call: CallbackQuery) -> None:
+    dk_num = int(call.data.split(":")[1])
+    from handlers.roles import _get_effective_role
+    role = await _get_effective_role(call.message)
+    if role < 5:
+        await call.answer("⛔ Только Владелец!", show_alert=True)
+        return
+    await repo.set_tree_enabled(call.message.chat.id, dk_num, False)
+    emoji, name, _ = DK_DATA[dk_num]
+    await call.answer(f"❌ ДК {dk_num} выключено!", show_alert=True)
+    await call.message.edit_text(
+        f"{emoji} <b>ДК {dk_num} — {name}</b>\n\nСтатус: <b>❌ выключено</b>",
+        reply_markup=kb_dk_toggle(dk_num)
+    )
+
+
+@router.callback_query(F.data == "dk_control")
+async def cb_dk_control(call: CallbackQuery) -> None:
+    await call.answer()
+    await call.message.edit_text(
+        "🔑 <b>ДК управление (владелец)</b>\n\n"
+        "<code>+дк N</code> — включить\n"
+        "<code>-дк N</code> — выключить\n"
+        "<code>!дк N M</code> — мин. должность\n"
+        "<code>!дк</code> — список всех ДК",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🌲 Управлять ДК кнопками", callback_data="dk_menu")],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="help_menu")],
+        ])
+    )
+
+
+# ── Правила ───────────────────────────────────────────────────────────────────
 
 @router.message(Command("правила"))
 @router.message(F.text.lower().in_({"правила", "!правила", ".правила"}))
@@ -177,17 +310,14 @@ async def cmd_rules(message: Message) -> None:
     await message.reply(rules)
 
 
-# ─── /установка ───────────────────────────────────────────────────────────────
+# ── Установка ─────────────────────────────────────────────────────────────────
 
 @router.message(Command("установка"))
 @router.message(F.text.lower().in_({"установка", "!установка", ".установка"}))
 async def cmd_install(message: Message) -> None:
     user = message.from_user
     await repo.get_or_create_user(user.id, user.username, user.full_name)
-
-    # Начисляем 50 ирисок за просмотр инструкции
     new_bal = await repo.update_balance(user.id, 50)
-
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💎 Получить Премиум", callback_data="show_premium_info")],
     ])
@@ -205,39 +335,42 @@ async def cb_show_install(call: CallbackQuery) -> None:
     new_bal = await repo.update_balance(user.id, 50)
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💎 Получить Премиум", callback_data="show_premium_info")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="main_menu")],
     ])
-    await call.message.answer(
+    await call.message.edit_text(
         INSTALL_TEXT + f"\n\n✅ <b>+50 ирисок начислено!</b> Баланс: <b>{new_bal} 🍬</b>",
         reply_markup=kb
     )
 
 
-# ─── /платно — покупка чатиков и премиума ─────────────────────────────────────
-
-CHECKS_PACKAGES = [
-    (5, 10, "Мини"),
-    (15, 25, "Стартовый"),
-    (50, 75, "Популярный 🔥"),
-]
+# ── Платно / Премиум ──────────────────────────────────────────────────────────
 
 @router.message(Command("платно"))
 @router.message(F.text.lower().in_({"платно", "!платно", ".платно"}))
 async def cmd_paid(message: Message) -> None:
-    lines = ["🎫 <b>Chatix — Платные функции</b>\n"]
-    lines.append("── Чатики (премиум-валюта) ──")
+    lines = ["🎫 <b>Chatix — Платные функции</b>\n", "── Чатики ──"]
     kb = []
-    for checks, stars, label in CHECKS_PACKAGES:
-        lines.append(f"• {label}: <b>{checks} чатиков</b> за ⭐ {stars} звёзд")
+    for i, (checks, stars, label) in enumerate(CHECKS_PACKAGES):
+        lines.append(f"• {label}: <b>{checks} 🎫</b> за ⭐ {stars}")
         kb.append([InlineKeyboardButton(
             text=f"{label}: {checks} 🎫 за ⭐{stars}",
-            callback_data=f"buy_checks_paid:{CHECKS_PACKAGES.index((checks, stars, label))}"
+            callback_data=f"buy_checks_paid:{i}"
         )])
-    lines.append("\n── Премиум-подписка ──")
-    lines.append("💎 <b>Premium</b> — 30 дней за ⭐ 50 звёзд")
-    lines.append("<i>Открывает /фричатики и премиум-товары</i>")
-    kb.append([InlineKeyboardButton(text="💎 Узнать о Premium", callback_data="show_premium_info")])
+    lines.append("\n── Премиум ──")
+    lines.append("💎 <b>Premium</b> — 30 дней за ⭐ 50")
+    kb.append([InlineKeyboardButton(text="ℹ️ О Premium", callback_data="show_premium_info")])
     kb.append([InlineKeyboardButton(text="💎 Купить Premium ⭐50", callback_data="buy_premium")])
     await message.reply("\n".join(lines), reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+
+
+@router.callback_query(F.data == "show_premium_info")
+async def cb_show_premium_info(call: CallbackQuery) -> None:
+    await call.answer()
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💎 Купить Premium ⭐50", callback_data="buy_premium")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="main_menu")],
+    ])
+    await call.message.edit_text(PREMIUM_INFO_TEXT, reply_markup=kb)
 
 
 @router.callback_query(F.data.startswith("buy_checks_paid:"))
@@ -254,50 +387,20 @@ async def cb_buy_checks_paid(call: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(F.data == "show_premium_info")
-async def cb_show_premium_info(call: CallbackQuery) -> None:
-    await call.answer()
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💎 Купить Premium за ⭐50", callback_data="buy_premium")],
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_paid")],
-    ])
-    await call.message.answer(PREMIUM_INFO_TEXT, reply_markup=kb)
-
-
-@router.callback_query(F.data == "back_to_paid")
-async def cb_back_to_paid(call: CallbackQuery) -> None:
-    await call.answer()
-    # Переиспользуем логику cmd_paid через фейковый message
-    lines = ["🎫 <b>Chatix — Платные функции</b>\n"]
-    lines.append("── Чатики (премиум-валюта) ──")
-    kb = []
-    for checks, stars, label in CHECKS_PACKAGES:
-        lines.append(f"• {label}: <b>{checks} чатиков</b> за ⭐ {stars} звёзд")
-        kb.append([InlineKeyboardButton(
-            text=f"{label}: {checks} 🎫 за ⭐{stars}",
-            callback_data=f"buy_checks_paid:{CHECKS_PACKAGES.index((checks, stars, label))}"
-        )])
-    lines.append("\n── Премиум-подписка ──")
-    lines.append("💎 <b>Premium</b> — 30 дней за ⭐ 50 звёзд")
-    kb.append([InlineKeyboardButton(text="💎 Узнать о Premium", callback_data="show_premium_info")])
-    kb.append([InlineKeyboardButton(text="💎 Купить Premium ⭐50", callback_data="buy_premium")])
-    await call.message.answer("\n".join(lines), reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
-
-
 @router.callback_query(F.data == "buy_premium")
 async def cb_buy_premium(call: CallbackQuery) -> None:
     await call.answer()
     from aiogram.types import LabeledPrice
     await call.message.answer_invoice(
         title="Chatix Premium 💎",
-        description="Премиум-подписка на 30 дней: /фричатики, доступ к премиум-товарам и многое другое!",
+        description="Премиум-подписка на 30 дней",
         payload=f"premium:{call.from_user.id}",
         currency="XTR",
         prices=[LabeledPrice(label="Premium 30 дней", amount=50)],
     )
 
 
-# ─── /фричатики — бесплатный чатик для премиум ────────────────────────────────
+# ── Фричатики ─────────────────────────────────────────────────────────────────
 
 @router.message(Command("фричатики"))
 @router.message(F.text.lower().in_({"фричатики", "!фричатики", ".фричатики"}))
@@ -308,8 +411,7 @@ async def cmd_free_chatik(message: Message) -> None:
     if ok:
         await message.reply(
             f"🎫 {user.full_name}, ты получил <b>1 бесплатный чатик</b>!\n"
-            f"Баланс чатиков: <b>{result} 🎫</b>\n\n"
-            f"<i>Следующий бесплатный чатик — через 24 часа</i>"
+            f"Баланс: <b>{result} 🎫</b>\n\n<i>Следующий — через 24 часа</i>"
         )
     elif result == "no_premium":
         kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -317,25 +419,21 @@ async def cmd_free_chatik(message: Message) -> None:
             [InlineKeyboardButton(text="ℹ️ Что даёт Premium?", callback_data="show_premium_info")],
         ])
         await message.reply(
-            "💎 <b>Эта команда только для Premium-пользователей!</b>\n\n"
-            "Оформи подписку и получай 1 бесплатный чатик каждый день 🎫",
+            "💎 <b>Только для Premium-пользователей!</b>\n\nОформи подписку и получай 1 чатик в день 🎫",
             reply_markup=kb
         )
     elif result == "expired":
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💎 Продлить Premium ⭐50", callback_data="buy_premium")],
-        ])
         await message.reply(
-            "⌛ <b>Твой Premium истёк.</b>\n\nПродли подписку чтобы снова получать бесплатные чатики!",
-            reply_markup=kb
+            "⌛ <b>Твой Premium истёк.</b>",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="💎 Продлить ⭐50", callback_data="buy_premium")
+            ]])
         )
     else:
-        await message.reply(
-            f"⏳ Следующий бесплатный чатик через <b>{result}</b>."
-        )
+        await message.reply(f"⏳ Следующий бесплатный чатик через <b>{result}</b>.")
 
 
-# ─── Обработка оплаты Premium ─────────────────────────────────────────────────
+# ── Оплата Premium ────────────────────────────────────────────────────────────
 
 @router.message(F.successful_payment)
 async def successful_payment_misc(message: Message) -> None:
@@ -345,14 +443,13 @@ async def successful_payment_misc(message: Message) -> None:
         await repo.activate_premium(user_id)
         await message.reply(
             "💎 <b>Premium активирован на 30 дней!</b>\n\n"
-            "Теперь тебе доступно:\n"
             "• /фричатики — 1 чатик каждый день\n"
             "• 💎 Премиум-товары в магазине\n\n"
             "Спасибо за поддержку Chatix! 🙏"
         )
 
 
-# ─── Приветствие новых участников ─────────────────────────────────────────────
+# ── Приветствие ───────────────────────────────────────────────────────────────
 
 @router.chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
 async def on_new_member(event: ChatMemberUpdated) -> None:
@@ -360,20 +457,20 @@ async def on_new_member(event: ChatMemberUpdated) -> None:
     if user.is_bot:
         return
     await repo.get_or_create_user(user.id, user.username, user.full_name)
-
     cs = await repo.get_chat_settings(event.chat.id)
     if cs and cs.welcome_message:
-        # Используем кастомное приветствие из настроек чата
         text = cs.welcome_message.replace("{name}", f"<b>{user.full_name}</b>")
     else:
         text = (
             f"👋 Добро пожаловать, <b>{user.full_name}</b>!\n\n"
-            f"Я <b>Chatix 2.0</b> — менеджер этого чата.\n"
-            f"Напиши /помощь чтобы узнать мои команды, и /установка чтобы добавить меня в свой чат!"
+            f"Я <b>Chatix beta 1.10.5</b> — менеджер этого чата.\n"
+            f"Напиши <b>помощь</b> чтобы узнать команды!"
         )
-
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📋 Команды", callback_data="show_help")],
-        [InlineKeyboardButton(text="📦 Установить в свой чат", callback_data="show_install")],
-    ])
-    await event.answer(text, reply_markup=kb)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="📋 Команды", callback_data="help_menu"),
+        InlineKeyboardButton(text="🌲 ДК", callback_data="dk_menu"),
+    ]])
+    try:
+        await event.answer(text, reply_markup=kb)
+    except Exception as e:
+        logger.warning(f"Приветствие: {e}")
